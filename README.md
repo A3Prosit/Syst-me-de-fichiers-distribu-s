@@ -1,17 +1,17 @@
 
 ### Mots Clés
--   IPC*
+-   IPC* : Inter-Process Communication - Mécanismes permettant à des processus concurrents de communiquer :  d'échange data entre PS, sync entre PS.
 -   Fichier de Log*
--   RPC*
--   NFS / DES*
--   Socket*
+-   RPC* : Remote Procedure Call
+-   NFS / DES* : / 
+-   Socket* : @IP + n° port 
 -   Couche IP
 -   Système de fichier
 -   Get / Post
 -   Fichier sur un réseau
 -   Gestion des droits d’accès
 -   Protocole
--   Communication inter-processus*
+-   Communication inter-processus* : IPC
 -   Conteneurs
 -   Cloud
 (* à définir)
@@ -50,3 +50,161 @@ Hypothèses
 -   Réalisations
 -   LACORBEILLED’EXERCICES
 
+
+## 1 - Systèmes de fichiers distribués :
+
+- Système de fichiers qui permet de partage de fichiers à plusieurs clients au travers du réseau informatique.
+- Le client n'a pas accès au stockage sous-jacent.
+- Utilise un protocole adéquat 
+- Ex :
+	- NFS
+	- AFS (inspiré du NFS)
+	- Ceph (données répliquées, tolérant aux pannes)
+	- Coda (inspiré NFS, informatique mobile)
+	- {...}
+## 2 - Le RPC :
+
+- Remote procedure Call
+- Appeler des fonctions qui sont situées sur une machine distante.*
+- Traiter des calculs (pratique pour centraliser sur un ordi puissant)
+- Microsoft RPC 
+- "SUN RPC" : Standard du domaine public
+	- Servait uniquement au système NFS (serveur de fichier) de Sun (Linux) à la base
+- Dans le programme client, on retrouve une fonction locale qui a le même nom que la distante
+- En réalité appelle d'autres fonctions de la bibliothèques RPC qui prennent en charge les connexions réseau
+-  Serveur ==> Attends les connexions clientes et appeler fonction avec bon paramètres + renvois résultat
+- Les fonctions qui prennent en charge les connexions réseau sont des **"stub"** (talons)
+- RPCss (Remote Procedure Call Subsystem) - processus générique de Windows NT/2000.XP (DHCP, Messenger...)
+
+**Stratégies d'appel procédure distante  **
+- migration : Code et données envoyés sur le site pour exécuter en local directement
+	- Statégie de pré-chargement en mémoire
+	- Très efficace pour de nombreux appels
+	- Problèmes de partage d'objet
+	- Mauvaise performances selon le volume de code et de données
+- mémoire partagée répartie : Procédure dans mémoire partagée entre client/serveur (enfaite dans espace réel du serveur)
+	- Efficace si tout le code et les données ne sont pas visités
+	- Pas de problème de pointeur
+	- Mais volumes de code et de données à échanger pages par pages
+- messages asynchrones : Requêtes & réponses 
+	- 
+** Avantages / inconvénients**
+
+**Créer son propre RPC :**
+
+````C
+//calcul.x
+
+struct data {
+  unsigned int arg1;
+  unsigned int arg2;
+};
+typedef struct data data;
+struct reponse {
+  unsigned int somme;
+  int errno;
+};
+typedef struct reponse reponse;
+program CALCUL{ // Nom du programme
+  version VERSION_UN{ //Nom version
+    void CALCUL_NULL(void) = 0; //Procédure 1 - Nom + numéro (0) (Obligatoire)
+    reponse CALCUL_ADDITION(data) = 1; //Procédure 2 - 1 seul arg au max donc --> struct
+  } = 1; //Numéro version
+} = 0x20000001; //Identifiant, ne rentrant pas en conflit avec d'autres programmes
+````
+
+- **rpcgen -a calcul.x** //a va permettre de produire un squelette pour programme client et fonction distante.
+	- calcul.h // entête
+	- calcul_clnt.c //talon client
+	- calcul_svc.c //talon serveur
+	- calcul_xdr.c //routines XDR - Définit les types
+- On écrit la fonction distante sur le serveur //calcul_server.c
+	- Compiler le tout
+	- Lier ensemble : **gcc** -o server calcul_svc.o calcul_server.o calcul_xdr.o
+	- Vérifier le fonctionnement :
+`````C
+$ ./server &
+[1] 2746
+
+$ rpcinfo -p
+   program no_version protocole  no_port
+    100000    2   tcp    111  portmapper
+    100000    2   udp    111  portmapper
+ 536870913    1   udp    803
+ 536870913    1   tcp    805
+
+$ rpcinfo -u localhost 536870913
+Le programme 536870913 de version 1 est prêt et en attente.
+`````
+- **On écrit la fonction cliente sur le serveur** //calcul_client.c
+	- Compiler + lier : 
+`gcc -c calcul_client.c`
+`gcc -o client calcul_client.o calcul_clnt.o calcul_xdr.o`
+
+{...}Tuto complet ici  http://okki666.free.fr/docmaster/articles/linux116.htm
+
+
+
+## 3 - NFS (Network File System):
+
+- Point de montage réseau sur serveur NFS (Pouvoir modifier comme en local) != FTP
+- A la base NFS était sous UNIX 
+- Sun Microsystems était un des pionniers dans le dév. de UNIX
+- Suit le modèle classique TCP IP
+- Utilise UDP ⇒ Performances (à travers le réseau)
+	- Rendu comme très simple (Pas de traces, requêtes indépendantes des unes des autres...) ⇒ File corruption do not occur and plus facile à gérer en cas de crash sur des cas pour retrouver des données.
+	- Le serveur répond juste, le client fait tout le boulot
+- Port de base : 2049
+- Sorti en V2 en 1989, le standard à évolué jusqu'en V4 jusqu'en 2003 (275 pages)
+	- V2/V3 prennent en compte la sécurité avec de l'authentification
+	- Selon les versions, de nouvelles procédures RPC (mkdir...)
+	- V4 des procédures RPC qui check les droits...
+- Inclus trois composantes pour fonctionner :
+	- External Data Representation (XDR) standards : Comment les données sont représentés dans l'échange
+		- Traduit dans la langue les données avant de les mettre sur le point de montage réseau
+		- Définit "int, bool, float, double, enum, void" {...}
+	- Remote Procedure Call (RPC) : Pour appeler les procédures sur les machines à distance
+		- Pour ne pas avoir les instructions sur chaque PC
+	- Des opérations et des procédures NFS qui utilisent le RPC
+	- Protocole de montage Un modèle basé sur UNIX (mais pas spécifique à lui même): 
+		- arrangement hiérarchique des répertoires (/etc/hosts == C:\Windows\Hosts)
+		- portion disponible pour le client
+ ![](http://www.tcpipguide.com/free/diagrams/nfscomponents.png)
+ 
+Les NAS ⇒ Equipements physiques qui peuvent utiliser NFS
+
+## 4 - DFS (Distributed File System) :
+- Système distribué de Microsoft Windows NT & Server
+- Mis sur l'AD 
+- Accessible via le protocole SMB (Server Message Block), dans un réseau distribué
+- Virtualise les serveurs sous forme de disque (drag and drop pour envoyer vers un serveur)
+- Simplifie la migration de données : Pas besoin de connaître nom serveur
+- Sécurité du NTFS
+- Permet de réduire les pb liés à la gestion complexe des config serveur en évolution permanente, quand anciens serveurs supprimés
+- On peut construire une hiérarchie comme on le souhaite avec les données de chaque serveur
+-    Deux composants: 
+	- Transparence de la localisation (pas le nom du serveur)
+	- Redondance : Réplication du composant sur plusieurs systèmes
+
+## 5 - Lexicographie :
+
+- Sun ONC/RPC : Open Network Computing / Remote Procedure Call ((Procédure distante))
+- TI-RPC : == Sun RP
+- **OSF DCE** - Open Software Foundation (OSF) a développé DCE (Distribued Computing Environment), fournissant un framework et un toolkit pour les applications client/serveur (dont un RPC, un répertoire, temps de service, un service d'authentification et le **DFS**)
+- OMG COBRA - Common Object Request Broker Architecture (COBRA) est un standarad définit par l'Object Management Group (OMG) pour facilité la communication des systèmes sur plusieurs plateformes, en utilisant un modèle orienté objet.
+- Sun Java RMI : <==> RPC mais version java (pas la même chose)
+- Sun J2EE EJB : Applications distribués (J2EE ==> web)
+- WS-SOAP : Web service - extension de SOAP (enveloppe), définissant l'intégrité et la confidentialité durant les communications (kerberos...)
+
+## 6 - Risques & problèmes :
+
+- Difficulté pour détecter les défaillances : porpriété d'asynchronise
+- Dynamisme : Composition du système change en permance 
+	- Pas d'état global
+	- difficultés pour administrer le système
+- Grande taille : Composants, utilisateurs, dispersion géographique...
+	- Capacité de croissance difficile à réaliser
+
+Système répartis qui ont réussis à s'adapter :
+- World Wide Web
+- DNS 
