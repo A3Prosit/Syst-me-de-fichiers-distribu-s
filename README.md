@@ -53,7 +53,7 @@ Hypothèses
 
 ## 1 - Systèmes de fichiers distribués :
 
-- Système de fichiers qui permet de partage de fichiers à plusieurs clients au travers du réseau informatique.
+- Système qui permet de partage de fichiers à plusieurs clients au travers du réseau informatique.
 - Le client n'a pas accès au stockage sous-jacent.
 - Utilise un protocole adéquat 
 - Ex :
@@ -62,33 +62,32 @@ Hypothèses
 	- Ceph (données répliquées, tolérant aux pannes)
 	- Coda (inspiré NFS, informatique mobile)
 	- {...}
+
+Un système de fichier se compose :
+- Modèle / archi fichier
+- Méthodes accès ressources
+- Méthodes opérations pour manipuler le fichier
+- Outils administratifs
+
 ## 2 - Le RPC :
 
 - Remote procedure Call
-- Appeler des fonctions qui sont situées sur une machine distante.*
+- Appeler des fonctions qui sont situées sur une machine distante.
 - Traiter des calculs (pratique pour centraliser sur un ordi puissant)
 - Microsoft RPC 
 - "SUN RPC" : Standard du domaine public
 	- Servait uniquement au système NFS (serveur de fichier) de Sun (Linux) à la base
 - Dans le programme client, on retrouve une fonction locale qui a le même nom que la distante
-- En réalité appelle d'autres fonctions de la bibliothèques RPC qui prennent en charge les connexions réseau
 -  Serveur ==> Attends les connexions clientes et appeler fonction avec bon paramètres + renvois résultat
 - Les fonctions qui prennent en charge les connexions réseau sont des **"stub"** (talons)
 - RPCss (Remote Procedure Call Subsystem) - processus générique de Windows NT/2000.XP (DHCP, Messenger...)
+- On peut mettre un système de queue
 
-**Stratégies d'appel procédure distante  **
-- migration : Code et données envoyés sur le site pour exécuter en local directement
-	- Statégie de pré-chargement en mémoire
-	- Très efficace pour de nombreux appels
-	- Problèmes de partage d'objet
-	- Mauvaise performances selon le volume de code et de données
-- mémoire partagée répartie : Procédure dans mémoire partagée entre client/serveur (enfaite dans espace réel du serveur)
-	- Efficace si tout le code et les données ne sont pas visités
-	- Pas de problème de pointeur
-	- Mais volumes de code et de données à échanger pages par pages
-- messages asynchrones : Requêtes & réponses 
-	- 
 ** Avantages / inconvénients**
+- Pratique pour les calculs
+MAIS 
+- Pas de pointeurs 
+- Pas de très gros volumes de données (bande passante)
 
 **Créer son propre RPC :**
 
@@ -151,18 +150,18 @@ Le programme 536870913 de version 1 est prêt et en attente.
 - A la base NFS était sous UNIX 
 - Sun Microsystems était un des pionniers dans le dév. de UNIX
 - Suit le modèle classique TCP IP
-- Utilise UDP ⇒ Performances (à travers le réseau)
+- Utilise UDP ⇒ Performances (à travers le réseau) (puis TCP depuis v3)
 	- Rendu comme très simple (Pas de traces, requêtes indépendantes des unes des autres...) ⇒ File corruption do not occur and plus facile à gérer en cas de crash sur des cas pour retrouver des données.
 	- Le serveur répond juste, le client fait tout le boulot
 - Port de base : 2049
 - Sorti en V2 en 1989, le standard à évolué jusqu'en V4 jusqu'en 2003 (275 pages)
 	- V2/V3 prennent en compte la sécurité avec de l'authentification
 	- Selon les versions, de nouvelles procédures RPC (mkdir...)
-	- V4 des procédures RPC qui check les droits...
-- Inclus trois composantes pour fonctionner :
+	- V4 des procédures RPC qui check les droits / chiffrements / Montée en charge / délégation / maintenance / réplication / reprise sous incident / compatibilité
+- Inclus quatre composantes pour fonctionner :
 	- External Data Representation (XDR) standards : Comment les données sont représentés dans l'échange
 		- Traduit dans la langue les données avant de les mettre sur le point de montage réseau
-		- Définit "int, bool, float, double, enum, void" {...}
+		- Définit "int, bool, float, double, enum, void" {...} / .xcml {...} ==> couche présentation
 	- Remote Procedure Call (RPC) : Pour appeler les procédures sur les machines à distance
 		- Pour ne pas avoir les instructions sur chaque PC
 	- Des opérations et des procédures NFS qui utilisent le RPC
@@ -172,6 +171,33 @@ Le programme 536870913 de version 1 est prêt et en attente.
  ![](http://www.tcpipguide.com/free/diagrams/nfscomponents.png)
  
 Les NAS ⇒ Equipements physiques qui peuvent utiliser NFS
+
+**Opérations** 
+````
+Procedure 0:  NULL - Do nothing 
+Procedure 1:  GETATTR - Get file attributes 
+Procedure 2:  SETATTR - Set file attributes 
+Procedure 3:  LOOKUP - Lookup filename 
+Procedure 4:  ACCESS - Check Access Permission 
+Procedure 5:  READLINK - Read from symbolic link 
+Procedure 6:  READ - Read From file 
+Procedure 7:  WRITE - Write to file 
+Procedure 8:  CREATE - Create a file 
+Procedure 9:  MKDIR - Create a directory 
+Procedure 10: SYMLINK - Create a symbolic link 
+Procedure 11: MKNOD - Create a special device 
+Procedure 12: REMOVE - Remove a File 
+Procedure 13: RMDIR - Remove a Directory 
+Procedure 14: RENAME - Rename a File or Directory 
+Procedure 15: LINK - Create Link to an object 
+Procedure 16: READDIR - Read From Directory 
+Procedure 17: READDIRPLUS - Extended read from directory 
+Procedure 18: FSSTAT - Get dynamic file system information 
+Procedure 19: FSINFO - Get static file system Information 
+Procedure 20: PATHCONF - Retrieve POSIX information 
+Procedure 21: COMMIT - Commit cached data on a server to stable storage
+````
+
 
 ## 4 - DFS (Distributed File System) :
 - Système distribué de Microsoft Windows NT & Server
@@ -186,19 +212,23 @@ Les NAS ⇒ Equipements physiques qui peuvent utiliser NFS
 	- Transparence de la localisation (pas le nom du serveur)
 	- Redondance : Réplication du composant sur plusieurs systèmes
 
-## 5 - Lexicographie :
+**Important**
+- Racine : Point entrée
+- Dossiers : Dossier qui permet accéder
+- Cible : Serveur sur lequel sont stockés les données
+## 5 - Lexicographie - IDL :
 
 - Sun ONC/RPC : Open Network Computing / Remote Procedure Call ((Procédure distante))
 - TI-RPC : == Sun RP
 - **OSF DCE** - Open Software Foundation (OSF) a développé DCE (Distribued Computing Environment), fournissant un framework et un toolkit pour les applications client/serveur (dont un RPC, un répertoire, temps de service, un service d'authentification et le **DFS**)
-- OMG COBRA - Common Object Request Broker Architecture (COBRA) est un standarad définit par l'Object Management Group (OMG) pour facilité la communication des systèmes sur plusieurs plateformes, en utilisant un modèle orienté objet.
+- OMG CORBA - Common Object Request Broker Architecture (CORBA) est un standarad définit par l'Object Management Group (OMG) pour facilité la communication des systèmes sur plusieurs plateformes, en utilisant un modèle orienté objet.
 - Sun Java RMI : <==> RPC mais version java (pas la même chose)
 - Sun J2EE EJB : Applications distribués (J2EE ==> web)
 - WS-SOAP : Web service - extension de SOAP (enveloppe), définissant l'intégrité et la confidentialité durant les communications (kerberos...)
 
 ## 6 - Risques & problèmes :
 
-- Difficulté pour détecter les défaillances : porpriété d'asynchronise
+- Difficulté pour détecter les défaillances : propriété d’asynchronisme
 - Dynamisme : Composition du système change en permance 
 	- Pas d'état global
 	- difficultés pour administrer le système
@@ -208,3 +238,19 @@ Les NAS ⇒ Equipements physiques qui peuvent utiliser NFS
 Système répartis qui ont réussis à s'adapter :
 - World Wide Web
 - DNS 
+
+## 7 - Principes & autres méthodes d'appels de proc distantes:
+
+**Stratégies d'appel procédure distante  **
+- **migration** : Code et données envoyés sur le serveur pour exécuter en local directement
+	- Statégie de pré-chargement en mémoire
+	- Très efficace pour de nombreux appels
+	- Problèmes de partage d'objet
+	- Mauvaise performances selon le volume de code et de données
+
+- **mémoire partagée répartie** : Procédure dans mémoire partagée entre client/serveur (enfaite dans espace réel du serveur)
+	- Efficace si tout le code et les données ne sont pas visités
+	- Pas de problème de pointeur
+	- Mais volumes de code et de données à échanger pages par pages
+- **Par message Asynchrone** : RPC bad 
+- **Par appel léger :** RPC 
